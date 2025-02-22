@@ -2,10 +2,6 @@ import pyvisa as visa
 import sys
 import time
 
-ADDRESS = 'USB0::0x2EC7::0x8800::802752042737870006::INSTR'
-# 8625 USB0::0x2EC7::0x8800::802752042737870006::INSTR
-# 8600 USB0::0xFFFF::0x9200::602203010717510021::INSTR
-
 class Controller:
     def __init__(self):
         self.rm = visa.ResourceManager()

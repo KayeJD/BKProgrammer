@@ -1,5 +1,5 @@
 SlowRate 1
-Range 232
+Range 23
 Count 21
 Step 10
 Level 22
