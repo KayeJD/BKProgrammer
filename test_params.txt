@@ -1,0 +1,7 @@
+SlowRate 1
+Range 232
+Count 21
+Step 10
+Level 22
+Width 20
+Slew 1
