@@ -1,3 +1,5 @@
+import pyvisa as visa
+import sys
 import time
 
 class MockInstrument:
@@ -20,7 +22,6 @@ class MockInstrument:
         return "Unknown command"
 
     def write(self, command):
-        # Simulate writing to the instrument
         print(f"Mock write: {command}")
 
     def read(self):
