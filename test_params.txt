@@ -1,7 +1,7 @@
 SlowRate 0
-Range 23
+Range 30
 Count 21
-Step 15
-Level 22
-Width 20
-Slew 3
+Step 5
+Level 2
+Width 10
+Slew .1
