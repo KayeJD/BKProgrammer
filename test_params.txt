@@ -1,7 +1,7 @@
-SlowRate 1
+SlowRate 0
 Range 23
 Count 21
-Step 10
+Step 15
 Level 22
 Width 20
-Slew 1
+Slew 3

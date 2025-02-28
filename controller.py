@@ -39,13 +39,6 @@ class Controller:
 class ListProgrammer:
     def __init__(self, controller: Controller):
         self.controller = controller
-        self.range = None
-        self.count = None
-        self.step = None
-        self.level = None
-        self.slowRate = None
-        self.slew = None
-        self.width = None
 
     def get_list_params(self, txt_file_path):
         params_approved = True
@@ -141,13 +134,13 @@ class ListProgrammer:
         print(f'Range: {self.controller.inst.query(f"LIST:RANGe?")}', end="")
         print(f'Count: {self.controller.inst.query(f"LIST:COUNt?")}', end="")
         print(f'Steps: {self.controller.inst.query(f"LIST:STEP?")}', end="")
-        print(f'Level: {self.controller.inst.query(f"LIST:LEVel? 1")}')
+        # print(f'Level: {self.controller.inst.query(f"LIST:LEVel? 1")}')
 
-        # for i in range(1, int(self.step) + 1):
-        #     print(f'Step {i}: ', end="")
-        #     print(f'Level={self.controller.inst.query(f"LIST:LEVel? {i}")}'.replace("\n", " "), end="\t")
-        #     print(f'Width={self.controller.inst.query(f"LIST:WIDth? {i}")}'.replace("\n", " "), end="\t")
-        #     print(f'Slew={self.controller.inst.query(f"LIST:SLEW? {i}")}', end="")
+        for i in range(1, int(self.step) + 1):
+            print(f'Step {i}: '.replace("\n", " "), end="\t")
+            print(f'Level={self.controller.inst.query(f"LIST:LEVel? {i}")}'.replace("\n", " "), end="\t")
+            print(f'Width={self.controller.inst.query(f"LIST:WIDth? {i}")}'.replace("\n", " "), end="\t")
+            print(f'Slew={self.controller.inst.query(f"LIST:SLEW? {i}")}', end="")
 
     def set_list_params(self):
         self.controller.inst.write(f"LIST:SLOWrate {self.slowRate}")
@@ -156,21 +149,22 @@ class ListProgrammer:
         self.controller.inst.write(f"LIST:STEP {self.step}")
 
         for i in range(1, int(self.step) + 1):
+            print(f'Step {i}: '.replace("\n", " "), end="\t")
             level_inc = (self.range / self.step) * i
 
-            self.controller.inst.write(f"LIST:LEVel {i}, %.1f", level_inc)
-            print(f"LIST:LEVel {i}, %.1f", level_inc)
+            self.controller.inst.write(f"LIST:LEVel {i}, {level_inc}")
+            print(f"LIST:LEVel {i}, {level_inc}".replace("\n", " "), end="\t")
             self.controller.inst.query('SYSTem:ERRor?')
 
-            self.controller.inst.write(f"LIST:SLEW {i}, {self.slew}")
-            print(f"LIST:SLEW {i}, {self.slew}")
+            self.controller.inst.write(f"LIST:SLEW {i}, {int(self.slew)}")
+            print(f"LIST:SLEW {i}, {int(self.slew)}".replace("\n", " "), end="\t")
             self.controller.inst.query('SYSTem:ERRor?')
 
             self.controller.inst.write(f"LIST:WIDth {i}, {self.width}")
             print(f"LIST:WIDth {i}, {self.width}")
             self.controller.inst.query('SYSTem:ERRor?')
 
-            print(f'Increment: {level_inc}')
+            # print(f'Increment: {level_inc}')
 
         print("\n***DONE writing list to load")
 
@@ -338,12 +332,12 @@ def main():
                     choice = input("Select an option (1-3): ").strip()
                     if choice == '1':
                         command = input("Type in entire command to .write: ").strip()
-                        controller.inst.write(command)
+                        print(controller.inst.write(command))
                     elif choice == '2':
                         print(controller.inst.read())
                     elif choice == '3':
                         command = input("Type in entire command to .query: ").strip()
-                        controller.inst.query(command)
+                        print(controller.inst.query(command))
                     elif choice == '4':
                         break
                     else:
