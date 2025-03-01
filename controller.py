@@ -1,9 +1,23 @@
 # look up commands
+""" SCPI COMMANDS
+========================================================================================================================
+.write
+    -
+    -
+
+.query
+    -
+    -
+
+.read
+    -
+    -
+========================================================================================================================
+"""
 
 import pyvisa as visa
 import sys
 import time
-import set_params
 
 class Controller:
     def __init__(self):
@@ -128,12 +142,8 @@ class ListProgrammer:
                 print('Slew: High-rate (A/us)')
             else:
                 print('Slew: Low-rate (A/ms)')
-            print(f'Range: {self.range}')
-            print(f'Count: {self.count}')
-            print(f'Step: {self.step}')
-            print(f'Level: {self.level}')
-            print(f'Slew: {self.slew}')
-            print(f'Width: {self.width}')
+            print(f'Range: {self.range} \t Count: {self.count} \t Step: {self.step} \t '
+                  f'Level: {self.level} \t Slew: {self.slew} \t Width: {self.width} \n')
         else:
             print('ERROR: One or more invalid values were provided.')
 
@@ -143,7 +153,6 @@ class ListProgrammer:
         print(f'Range: {self.controller.inst.query(f"LIST:RANGe?")}', end="")
         print(f'Count: {self.controller.inst.query(f"LIST:COUNt?")}', end="")
         print(f'Steps: {self.controller.inst.query(f"LIST:STEP?")}', end="")
-        # print(f'Level: {self.controller.inst.query(f"LIST:LEVel? 1")}')
 
         for i in range(1, int(self.step) + 1):
             print(f'Step {i}: '.replace("\n", " "), end="\t")
@@ -151,11 +160,8 @@ class ListProgrammer:
             print(f'Width={self.controller.inst.query(f"LIST:WIDth? {i}")}'.replace("\n", " "), end="\t")
             print(f'Slew={self.controller.inst.query(f"LIST:SLEW? {i}")}', end="")
 
-    # TODO: move the set_params function to separate file
-    def set_list_params(self):
-        # self.controller.inst.write('*RST')
-        # self.controller.inst.write('*WAI')
-        # print(self.controller.inst.query('SYSTem:ERRor?'), end="")
+
+    def write_list_params(self):
         self.controller.inst.write(f'LIST:RCL 1')
         print(self.controller.inst.query('STAT:QUES:COND?'))
 
@@ -196,8 +202,10 @@ class ListProgrammer:
             print(f'Steps: {self.controller.inst.query(f"LIST:STEP?")}', end="")
             for i in range(1, int(self.step) + 1):
                 print(f'Step {i}: ', end='')
-                print(f'Level={self.controller.inst.query(f"LIST:LEVel? {i}")}'.replace("\n", " "), end="\t")
-                print(f'Width={self.controller.inst.query(f"LIST:WIDth? {i}")}'.replace("\n", " "), end="\t")
+                print(f'Level={self.controller.inst.query(f"LIST:LEVel? {i}")}'
+                      .replace("\n", " "), end="\t")
+                print(f'Width={self.controller.inst.query(f"LIST:WIDth? {i}")}'
+                      .replace("\n", " "), end="\t")
                 print(f'Slew={self.controller.inst.query(f"LIST:SLEW? {i}")}', end="")
 
     def restore_list(self, location):
@@ -209,7 +217,6 @@ class ListProgrammer:
         self.level = self.controller.inst.query(f"LIST:LEVel? 1")
         self.width = self.controller.inst.query(f"LIST:WIDth? 1")
         self.slew = self.controller.inst.query(f"LIST:SLEW? 1")
-        # self.read_load_list(location)
 
     def run_list(self):
         self.controller.inst.write('FUNCtion:MODE LIST')
@@ -221,7 +228,6 @@ class ListProgrammer:
         self.controller.inst.write('*WAI')
         self.controller.inst.write("input off")
         self.controller.inst.write("func:mode fix")
-        # self.reset()
 
     def error_check(self):
         print(self.controller.inst.query('SYSTem:ERRor?'))
@@ -232,11 +238,8 @@ class ListProgrammer:
     def reset(self):
         print(self.controller.inst.query('*TST?'))
         self.error_check()
-        # self.controller.inst.write('*RST')
         self.controller.inst.write('*RCL 0')
         self.controller.inst.write('*CLS')
-        # self.controller.inst.write('*SRE 0')
-        # self.controller.inst.write('*ESE 0')
         self.error_check()
 
 
@@ -283,7 +286,6 @@ def main():
     controller = Controller()
     controller.connect()
     list_programmer = ListProgrammer(controller)
-    # list_programmer.controller.inst.write("List:Func 1")
     list_programmer.get_list_params("test_params.txt")
 
     while True:
@@ -306,7 +308,7 @@ def main():
                 if param_choice == '1':
                     list_programmer.get_list_params("test_params.txt")
                 elif param_choice == '2':
-                    list_programmer.set_list_params()
+                    list_programmer.write_list_params()
                 elif param_choice == '3':
                     save_location = input("Select a save location (1-5): ")
                     try:

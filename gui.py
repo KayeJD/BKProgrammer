@@ -10,15 +10,72 @@ class App:
         self.controller = controllerTest.Controller()
         self.controller.connect()
         self.list_programmer = controllerTest.ListProgrammer(self.controller)
+        self.running = True
+
         self.data_queue = queue.Queue()
         self.list_queue = queue.Queue()
+        self.error_log = queue.Queue()
 
+        self.input_range = 0
+        self.input_count = 0
+        self.input_step = 0
+        self.input_level = 0
+        self.input_slowrate = 0
+        self.input_slew = 0.0
+        self.input_width = 0.0
+
+        # self.thread = threading.Thread(target=self.read_instrument_data, daemon=True)
+        # self.thread.start()
+        
+        # TODO: update stored lists 1-5
+
+    # Get data from continuous thread running
+    # def read_instrument_data(self):
+    #     while self.running:
+    #         # response = self.controller.send_command("MEASure:CURRent?")  # Example SCPI command
+    #         # self.data_queue.put(response)
+    #         print('Read thread running')
+
+    # When the SAVED tab is opened, update all of the lists
     def update_stored_lists(self):
         for i in range(1, 6):
-            self.list_programmer.restore_list(i)
+            ra, sl, co, st, le, wi, sl = self.list_programmer.restore_list(i) # The list parameters
 
-    def send_list_params(self):
-        if (dpg.get_value('input_slowrate') == 'High-rate (A/us)'):
+            # for item in dpg.get_item_children(f'saved_list_{i}', slot=1):
+            #     dpg.delete_item(item)
+            #
+            with dpg.table_row(parent=f'saved_list_{i}'):
+                dpg.add_text('SlowRate')
+                dpg.add_text(sl)
+            with dpg.table_row(parent=f'saved_list_{i}'):
+                dpg.add_text('Range')
+                dpg.add_text(ra)
+            with dpg.table_row(parent=f'saved_list_{i}'):
+                dpg.add_text('Count')
+                dpg.add_text(co)
+            with dpg.table_row(parent=f'saved_list_{i}'):
+                dpg.add_text('Step')
+                dpg.add_text(st)
+            with dpg.table_row(parent=f'saved_list_{i}'):
+                dpg.add_text('Level')
+                dpg.add_text(le)
+            with dpg.table_row(parent=f'saved_list_{i}'):
+                dpg.add_text('Width')
+                dpg.add_text(wi)
+            with dpg.table_row(parent=f'saved_list_{i}'):
+                dpg.add_text('Slew')
+                dpg.add_text(sl)
+            #write
+
+        # while not self.list_queue.empty():
+        #     response = self.list_queue.get()
+            # dpg.set_value("instrument_data", f"Current: {response} A")  # Update GUI
+
+        # dpg.render_dearpygui_frame()
+
+    # Send backend the inputted parameters to self, write to machine, then run list
+    def run_list_params(self):
+        if dpg.get_value('input_slowrate') == 'High-rate (A/us)':
             input_slowrate = 0
         else:
             input_slowrate = 1
@@ -30,6 +87,14 @@ class App:
                                             dpg.get_value('input_slew'),
                                             dpg.get_value('input_width'))
 
+        self.list_programmer.write_list_params()
+        self.list_programmer.run_list()
+
+    # stop ongoing app threads
+    def stop(self):
+        self.running = False
+        self.thread.join()
+
 
 def main():
     app = App()
@@ -38,8 +103,8 @@ def main():
     dpg.configure_app(manual_callback_management=True)
     dpg.setup_dearpygui()
 
-
     def _on_close(sender):
+        app.stop()
         dpg.delete_item(sender, children_only=True)
         dpg.delete_item(sender)
 
@@ -56,39 +121,47 @@ def main():
         with dpg.group(horizontal=True, width=0):
             with dpg.child_window(tag='left_container', width=250):
                 dpg.add_text('CURRENT WORKING LIST')
-                with dpg.group(horizontal=True):
-                    dpg.add_text('SlowRate: ')
-                    dpg.add_combo(("High-rate (A/us)", "Low-rate (A/ms)"), tag='input_slowrate')
-                with dpg.group(horizontal=True):
-                    dpg.add_text('Range: ')
-                    dpg.add_input_int(min_value=0, max_value=84, min_clamped=True, max_clamped=True, tag='input_range')
-                with dpg.group(horizontal=True):
-                    dpg.add_text('Count: ')
-                    dpg.add_input_int(min_value=0, max_value=65536, min_clamped=True, max_clamped=True, tag='input_count')
-                with dpg.group(horizontal=True):
-                    dpg.add_text('Step: ')
-                    dpg.add_input_int(min_value=0, max_value=84, min_clamped=True, max_clamped=True, tag='input_step')
-                with dpg.group(horizontal=True):
-                    dpg.add_text('Level: ')
-                    dpg.add_input_int(min_value=0, max_value=84, min_clamped=True, max_clamped=True, tag='input_level')
-                with dpg.group(horizontal=True):
-                    dpg.add_text('Width(s): ')
-                    dpg.add_input_float(before='(s)', min_value=0, min_clamped=True, tag='input_width')
-                with dpg.group(horizontal=True):
-                    dpg.add_text('Slew: ')
-                    dpg.add_input_int(tag='input_slew')
+                with dpg.table(header_row=False, row_background=False,
+                               borders_innerH=False, borders_outerH=False, borders_innerV=False,
+                               borders_outerV=False, delay_search=True) as saved_list_1:
+                    dpg.add_table_column(width_fixed=True)
+                    dpg.add_table_column()
+                    with dpg.table_row():
+                        dpg.add_text('SlowRate: ')
+                        dpg.add_combo(("High-rate (A/us)", "Low-rate (A/ms)"), default_value="Low-rate (A/ms)",
+                                      tag='input_slowrate')
+                    with dpg.table_row():
+                        dpg.add_text('Range: ')
+                        dpg.add_input_int(min_value=0, max_value=84, min_clamped=True, default_value=app.input_range,
+                                          max_clamped=True, tag='input_range')
+                    with dpg.table_row():
+                        dpg.add_text('Count: ')
+                        dpg.add_input_int(min_value=0, max_value=65536, min_clamped=True, default_value=app.input_count,
+                                          max_clamped=True, tag='input_count')
+                    with dpg.table_row():
+                        dpg.add_text('Step: ')
+                        dpg.add_input_int(min_value=0, max_value=84, min_clamped=True, default_value=app.input_step,
+                                          max_clamped=True, tag='input_step')
+                    with dpg.table_row():
+                        dpg.add_text('Level: ')
+                        dpg.add_input_int(min_value=0, max_value=84, min_clamped=True, default_value=app.input_level,
+                                          max_clamped=True, tag='input_level')
+                    with dpg.table_row():
+                        dpg.add_text('Width(s): ')
+                        dpg.add_input_float(min_value=0, min_clamped=True, tag='input_width', default_value=app.input_width)
+                    with dpg.table_row():
+                        dpg.add_text('Slew: ')
+                        dpg.add_input_float(tag='input_slew', default_value=app.input_slew)
                 with dpg.group(horizontal=True):
                     dpg.add_button(tag='run_list', label='Run',
-                                   callback=app.send_list_params)
+                                   callback=app.run_list_params)
                     dpg.add_button(tag='save_list', label='Save', callback=app.list_programmer.save_list)
-                    # dpg.add_button(tag='retrieve_list', label='Restore', callback=app.restore_list)
                     # dpg.add_button(tag='error', label='Error', callback=lambda: dpg.configure_item("error_modal", show=True))
 
             with dpg.child_window(tag='right_container', autosize_x=True):
                 with dpg.tab_bar():
                     with dpg.tab(label="DATA"):
                         dpg.add_text('Charts: ')
-
                     with dpg.tab(label="SAVED LISTS"):
                         with dpg.group(horizontal=True):
                             dpg.add_text('Retrieve stored list: ')
@@ -97,112 +170,36 @@ def main():
                                            callback=lambda: app.list_programmer.restore_list(
                                                dpg.get_value('restore_location')))
 
-                        with dpg.table(header_row=True, row_background=True,
+                        with dpg.table(tag='saved_list_1', header_row=True, row_background=True,
                                        borders_innerH=True, borders_outerH=True, borders_innerV=True,
-                                       borders_outerV=True, delay_search=True) as saved_list_1:
+                                       borders_outerV=True, delay_search=True):
                             dpg.add_table_column(label="List 1")
                             dpg.add_table_column(label="Value")
-                            with dpg.table_row():
-                                dpg.add_text('SlowRate')
-                                # dpg.add_text(f'{self.controller.inst.query("LIST:SLOWrate?")}')
-                            with dpg.table_row():
-                                dpg.add_text('Range')
-                                dpg.add_text('SlowRate')
-                            with dpg.table_row():
-                                dpg.add_text('Count')
-                                dpg.add_text('SlowRate')
-                            with dpg.table_row():
-                                dpg.add_text('Step')
-                                dpg.add_text('SlowRate')
-                            with dpg.table_row():
-                                dpg.add_text('Level')
-                                dpg.add_text('SlowRate')
-                            with dpg.table_row():
-                                dpg.add_text('Width')
-                                dpg.add_text('SlowRate')
-                            with dpg.table_row():
-                                dpg.add_text('Slew')
-                                dpg.add_text('SlowRate')
 
-                        with dpg.table(header_row=True, row_background=True,
+                        with dpg.table(tag='saved_list_2', header_row=True, row_background=True,
                                        borders_innerH=True, borders_outerH=True, borders_innerV=True,
-                                       borders_outerV=True, delay_search=True) as saved_list_2:
+                                       borders_outerV=True, delay_search=True):
                             dpg.add_table_column(label="List 2")
                             dpg.add_table_column(label="Value")
-                            with dpg.table_row():
-                                dpg.add_text('SlowRate')
-                            with dpg.table_row():
-                                dpg.add_text('Range')
-                            with dpg.table_row():
-                                dpg.add_text('Count')
-                            with dpg.table_row():
-                                dpg.add_text('Step')
-                            with dpg.table_row():
-                                dpg.add_text('Level')
-                            with dpg.table_row():
-                                dpg.add_text('Width')
-                            with dpg.table_row():
-                                dpg.add_text('Slew')
 
-                        with dpg.table(header_row=True, row_background=True,
+                        with dpg.table(tag='saved_list_3',header_row=True, row_background=True,
                                        borders_innerH=True, borders_outerH=True, borders_innerV=True,
-                                       borders_outerV=True, delay_search=True) as saved_list_3:
+                                       borders_outerV=True, delay_search=True):
                             dpg.add_table_column(label="List 3")
                             dpg.add_table_column(label="Value")
-                            with dpg.table_row():
-                                dpg.add_text('SlowRate')
-                            with dpg.table_row():
-                                dpg.add_text('Range')
-                            with dpg.table_row():
-                                dpg.add_text('Count')
-                            with dpg.table_row():
-                                dpg.add_text('Step')
-                            with dpg.table_row():
-                                dpg.add_text('Level')
-                            with dpg.table_row():
-                                dpg.add_text('Width')
-                            with dpg.table_row():
-                                dpg.add_text('Slew')
 
-                        with dpg.table(header_row=True, row_background=True,
+                        with dpg.table(tag='saved_list_4',header_row=True, row_background=True,
                                        borders_innerH=True, borders_outerH=True, borders_innerV=True,
-                                       borders_outerV=True, delay_search=True) as saved_list_4:
+                                       borders_outerV=True, delay_search=True):
                             dpg.add_table_column(label="List 4")
                             dpg.add_table_column(label="Value")
-                            with dpg.table_row():
-                                dpg.add_text('SlowRate')
-                            with dpg.table_row():
-                                dpg.add_text('Range')
-                            with dpg.table_row():
-                                dpg.add_text('Count')
-                            with dpg.table_row():
-                                dpg.add_text('Step')
-                            with dpg.table_row():
-                                dpg.add_text('Level')
-                            with dpg.table_row():
-                                dpg.add_text('Width')
-                            with dpg.table_row():
-                                dpg.add_text('Slew')
 
-                        with dpg.table(header_row=True, row_background=True,
+                        with dpg.table(tag='saved_list_5',header_row=True, row_background=True,
                                        borders_innerH=True, borders_outerH=True, borders_innerV=True,
-                                       borders_outerV=True, delay_search=True) as saved_list_5:
+                                       borders_outerV=True, delay_search=True):
                             dpg.add_table_column(label="List 5")
                             dpg.add_table_column(label="Value")
-                            with dpg.table_row():
-                                dpg.add_text('SlowRate')
-                            with dpg.table_row():
-                                dpg.add_text('Range')
-                            with dpg.table_row():
-                                dpg.add_text('Count')
-                            with dpg.table_row():
-                                dpg.add_text('Step')
-                            with dpg.table_row():
-                                dpg.add_text('Level')
-                            with dpg.table_row():
-                                dpg.add_text('Width')
-                            with dpg.table_row():
-                                dpg.add_text('Slew')
+
 
         # with dpg.popup(dpg.last_item(), tag='error_modal', modal=True,
         #                mousebutton=dpg.mvMouseButton_Left):
@@ -213,6 +210,7 @@ def main():
         #                        callback=lambda: dpg.configure_item("error_modal",
         #                                                                show=False))
 
+    app.update_stored_lists()
     dpg.show_viewport()
     dpg.set_primary_window('dashboard_window', True)
     # dpg.set_viewport_resize_callback(resize_update_position)
