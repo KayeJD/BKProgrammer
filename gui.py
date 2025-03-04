@@ -126,6 +126,29 @@ def main():
     dpg.configure_app(manual_callback_management=True)
     dpg.setup_dearpygui()
 
+    # def run_task():
+    #     global running
+    #     global paused
+    #     global progress
+    #     print("Running...")
+    #
+    #     for i in range(1, 101):
+    #         while paused:
+    #             time.sleep(0.1)
+    #         if not running:
+    #             return
+    #         progress = i
+    #         print(i)
+    #         dpg.set_value(progress_bar, 1 / 100 * (i))
+    #         dpg.configure_item(progress_bar, overlay=f"{i}%")
+    #         time.sleep(0.05)
+    #
+    #     print("Finished")
+    #     running = False
+    #     dpg.set_item_label(start_pause_resume_button, "Finished")
+    #     dpg.disable_item(start_pause_resume_button)
+    #     dpg.show_item(reset_button)
+
     def _on_close(sender):
         app.stop()
         dpg.delete_item(sender, children_only=True)
@@ -152,31 +175,36 @@ def main():
                     with dpg.table_row():
                         dpg.add_text('SlowRate: ')
                         dpg.add_combo(("High-rate (A/us)", "Low-rate (A/ms)"), default_value="Low-rate (A/ms)",
-                                      tag='input_slowrate')
+                                      tag='input_slowrate', width=-1)
                     with dpg.table_row():
                         dpg.add_text('Range: ')
                         dpg.add_input_int(min_value=0, max_value=84, min_clamped=True, default_value=app.input_range,
-                                          max_clamped=True, tag='input_range')
+                                          max_clamped=True, tag='input_range', width=-1)
                     with dpg.table_row():
                         dpg.add_text('Count: ')
                         dpg.add_input_int(min_value=0, max_value=65536, min_clamped=True, default_value=app.input_count,
-                                          max_clamped=True, tag='input_count')
+                                          max_clamped=True, tag='input_count', width=-1)
                     with dpg.table_row():
                         dpg.add_text('Step: ')
                         dpg.add_input_int(min_value=2, max_value=84, min_clamped=True, default_value=app.input_step,
-                                          max_clamped=True, tag='input_step')
+                                          max_clamped=True, tag='input_step', width=-1)
                     with dpg.table_row():
                         dpg.add_text('Level: ')
                         dpg.add_input_int(min_value=0, max_value=84, min_clamped=True, default_value=app.input_level,
-                                          max_clamped=True, tag='input_level')
+                                          max_clamped=True, tag='input_level', width=-1)
                     with dpg.table_row():
                         dpg.add_text('Width(s): ')
-                        dpg.add_input_float(min_value=0, min_clamped=True, tag='input_width', default_value=app.input_width)
+                        dpg.add_input_float(min_value=0, min_clamped=True, tag='input_width',
+                                            default_value=app.input_width, width=-1)
                     with dpg.table_row():
                         dpg.add_text('Slew: ')
-                        dpg.add_input_float(tag='input_slew', default_value=app.input_slew)
-                dpg.add_button(tag='run_list', label='Run',
-                               callback=app.run_list_params)
+                        dpg.add_input_float(tag='input_slew', default_value=app.input_slew, width=-1)
+
+                with dpg.group(horizontal=True, width=0):
+                    dpg.add_button(tag='run_list', label='Run', width=40, callback=app.run_list_params)
+                    # progress_bar = dpg.add_progress_bar(default_value=0, width=-1, overlay="0%")
+
+
                 dpg.add_separator()
                 dpg.add_text('SAVE LIST:')
                 with dpg.group(horizontal=True):
