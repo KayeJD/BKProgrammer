@@ -11,19 +11,15 @@
         - determined by slowrate
     -LIST:COUNt <1 to 65536>
         - 65536 = inf
-    -LIST:STEP <2 to 84>
-        -
-    -LIST:COUNt <1 to 65536>
-        -
+    -LIST:STEP <2 to 83>
+        - making it to 84 will force it into fixed mode
+    -LIST:LEV <1 to maxCurrRange>
+        - 65536 = inf
     -LIST:WIDth <step>, <20us to 3600s>
         - unit is in seconds
 .query (basically just a write and read in one. remember to print out)
     - doesn't retutrn anything?
-    -
-
-.read
-    -
-    -
+    - remember to read back or else it'll throw queue interrupted error
 ========================================================================================================================
 """
 
@@ -92,7 +88,8 @@ class Controller:
 
     def check_connection(self):
         if not fake_inst:
-            self.idn = self.inst.query("*IDN?")
+            print(self.inst.query("*IDN?"))
+            # self.inst.read()
             try:
                 if self.idn:
                     print(f"Connected to: {self.idn}")
@@ -166,7 +163,7 @@ class ListProgrammer:
 
                     # STEP
                     elif param_name == "step":
-                        if 1 < param_value < 85:
+                        if 1 < param_value < 84:
                             self.step = int(param_value)
                         else:
                             print("STEP: Value needs to be 1 < x < 85")
@@ -207,7 +204,7 @@ class ListProgrammer:
             else:
                 print('Slew: Low-rate (A/ms)')
             print(f'Range: {self.range} \t Count: {self.count} \t Step: {self.step} \t '
-                  f'Level: {self.level} \t Slew: {self.slew} \t Width: {self.width} \n')
+                  f'Level: {self.level} \t Slew: {self.slew} \t Width: {self.width}s \n')
         else:
             print('ERROR: One or more invalid values were provided.')
 
@@ -249,33 +246,36 @@ class ListProgrammer:
 
     def write_list_params(self):
         print('\nWRITING SETTINGS TO CURRENT LIST...')
-        # self.controller.inst.write(f'LIST:RCL 1')
-        # print(self.controller.inst.query('STAT:QUES:COND?'))
+        # self.error_check()
 
         self.controller.inst.write(f"LIST:SLOWrate {self.slowRate}")
         print(f'LIST:SLOWrate {self.slowRate}')
+        # self.error_check()
         self.controller.inst.write(f"LIST:RANGe {self.range}")
         print(f'LIST:RANGe {self.range}')
+        # self.error_check()
         self.controller.inst.write(f"LIST:COUNt {self.count}")
         print(f'LIST:COUNt {self.count}')
+        # self.error_check()
         self.controller.inst.write(f"LIST:STEP {self.step}")
-        print(f'LIST:STEP {self.step}")')
+        print(f'LIST:STEP {self.step}')
+        # self.error_check()
 
         for i in range(1, self.step + 1):
-            print(f'Step {i}: ')
+            print(f'Step {i}: ', end='\t')
             level_inc = (self.range / self.step) * i
 
-            self.controller.inst.write(f"LIST:LEVel {i}, {self.level:.3f}")
-            print(f'LIST:LEVel {i}, {self.level:.3f}')
+            self.controller.inst.write(f"LIST:LEVel {i}, {level_inc:.2f}")
+            print(f'LIST:LEVel {i}, {self.level:.2f}', end='\t')
             self.controller.inst.write(f"LIST:SLEW {i}, {self.slew:.2f}")
-            print(f"LIST:SLEW {i}, {self.slew:.2f}")
-            self.controller.inst.write(f"LIST:WIDth {i}, {self.width:.3f}")
-            print(f"LIST:WIDth {i}, {self.width:.3f}")
+            print(f"LIST:SLEW {i}, {self.slew:.2f}", end='\t')
+            self.controller.inst.write(f"LIST:WIDth {i}, {self.width:.5f}")
+            print(f"LIST:WIDth {i}, {self.width:.5f}")
             self.controller.inst.write('*WAI')
             # self.controller.inst.query('*OPC?')
 
         self.controller.inst.write(f'LIST:SAV 1')
-        self.read_load_list()
+        # self.read_load_list()
 
     def read_all_load_lists(self):
         for location in range(1, 6):
@@ -325,7 +325,9 @@ class ListProgrammer:
             return self.range, self.slowRate, self.count, self.step, self.level, self.width, self.slew
 
     def run_list(self):
-        self.controller.inst.write('FUNCtion:MODE LIST')
+        self.controller.inst.write("list:rcl 1")
+        self.controller.inst.write("func:mode list")
+        self.controller.inst.write('*WAI')
         print('Load now in following mode: ', end='')
         print(self.controller.inst.query('FUNC:MODE?'))
 
@@ -333,10 +335,12 @@ class ListProgrammer:
         self.controller.inst.write('TRIG:SOUR BUS')
         print(self.controller.inst.query('TRIGGER:SOURCE?'))
         self.controller.inst.write("INPUT ON")
+        self.controller.inst.write('*WAI')
         self.controller.inst.write('*TRG')
         # print(self.controller.inst.query('STAT:OPER:COND?')) # get stat bit
 
-        time.sleep(25) #
+        execution_time = self.width * self.step * self.count
+        time.sleep(execution_time) #
         self.controller.inst.write('*WAI')
 
         self.controller.inst.write("INPUT OFF")
@@ -344,24 +348,34 @@ class ListProgrammer:
         print('DONE running list.')
 
     def error_check(self):
-        print(self.controller.inst.query('SYSTem:ERRor?'))
+        print(f'Self-test result: {self.controller.inst.query('*TST?')}', end='')
+        self.controller.inst.write('*WAI')
+        print(f'Error: {self.controller.inst.query('SYSTem:ERRor?')}')
+        self.controller.inst.write('*WAI')
 
     def save_list(self, location):
         self.controller.inst.write(f'LIST:SAV {location}')
 
     def reset(self):
-        print(self.controller.inst.query('*TST?'))
         self.error_check()
         self.controller.inst.write('*RCL 0')
-        self.controller.inst.write('*CLS')
+        # self.controller.inst.write('*WAI')
+        # self.controller.inst.write("*RST")
+        # self.controller.inst.write('*WAI')
+        self.controller.inst.write("*CLS")
+        # self.controller.inst.write('*WAI')
+        # self.controller.inst.write("*SRE 0")
+        # self.controller.inst.write('*WAI')
+        # self.controller.inst.write("*ESE 0")
+        # self.controller.inst.write('*WAI')
         self.error_check()
 
 
 def print_main_menu():
-    print("\n=========== BK Precision 8625 ============")
+    print("\n============ BK Precision 8625 =============")
     print("Please select an option from the menu below:")
     print("1. Check connection")
-    print("2. Parameter Configuration")
+    print("2. List Configuration")
     print("3. Execution Options")
     print("4. See all saved Lists")
     print("5. Exit")
@@ -380,7 +394,7 @@ def print_parameter_menu():
 
 
 def print_execution_menu():
-    print("\n===== Execution Options =====")
+    print("\n====== Execution Options ======")
     print("1. Run Current Session List")
     print("2. Read Current Settings")
     print("3. Back to Main Menu")
@@ -388,7 +402,7 @@ def print_execution_menu():
 
 
 def debug_menu():
-    print("\n===== Execution Options =====")
+    print("\n====== Execution Options ======")
     print("1. Send direct commands")
     print("2. Read Error")
     print("3. Reset")
@@ -457,26 +471,28 @@ def main():
 
             elif choice == '4':  # TODO: save the current session details bc it might bet overwritten
                 list_programmer.read_all_load_lists()
+                list_programmer.controller.inst.write(f'LIST:RCL 1')
 
             elif choice == '0':
                 while True:
                     debug_menu()
                     choice = input("Select an option (1-4): ").strip()
                     if choice == "1":
-                        print("1. Write \t 2.Read \t 3. Query \t 4. Back")
-                        choice = input("Select an option (1-3): ").strip()
-                        if choice == '1':
-                            command = input("Type in entire command to .write: ").strip()
-                            print(controller.inst.write(command))
-                        elif choice == '2':
-                            print(controller.inst.read())
-                        elif choice == '3':
-                            command = input("Type in entire command to .query: ").strip()
-                            print(controller.inst.query(command))
-                        elif choice == '4':
-                            break
-                        else:
-                            print("Invalid input. Please try again.")
+                        while True:
+                            print("1. Write \t 2.Read \t 3. Query \t 4. Back")
+                            choice = input("Select an option (1-3): ").strip()
+                            if choice == '1':
+                                command = input("Type in entire command to .write: ").strip()
+                                print(controller.inst.write(command))
+                            elif choice == '2':
+                                print(controller.inst.read())
+                            elif choice == '3':
+                                command = input("Type in entire command to .query: ").strip()
+                                print(controller.inst.query(command))
+                            elif choice == '4':
+                                break
+                            else:
+                                print("Invalid input. Please try again.")
                     elif choice == "2":
                         list_programmer.error_check()
                     elif choice == "3":
