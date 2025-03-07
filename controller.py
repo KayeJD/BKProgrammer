@@ -1,11 +1,23 @@
-# look up commands
 """ SCPI COMMANDS
 ========================================================================================================================
 .write
-    -
-    -
-
-.query
+    -LIST:SLOWrate <0 or 1>
+        - 0:High-rate(A/us)     1:Slow-rate(A/ms)
+    -LIST:RANG <p>
+        - p:0-max current
+    -LIST:SLEW <step>, <p>
+        - "slew" refers to the rate of change of current output,
+        - essentially how quickly the output can transition from one level to another
+        - determined by slowrate
+    -LIST:COUNt <1 to 65536>
+        - 65536 = inf
+    -LIST:STEP <2 to 84>
+        -
+    -LIST:COUNt <1 to 65536>
+        -
+    -LIST:WIDth <step>, <20us to 3600s>
+        - unit is in seconds
+.query (basically just a write and read in one. remember to print out)
     -
     -
 
@@ -19,7 +31,7 @@ import pyvisa as visa
 import sys
 import time
 
-fake_inst = True
+fake_inst = False
 if fake_inst:
     list_queue = None
     inst_memory = {
