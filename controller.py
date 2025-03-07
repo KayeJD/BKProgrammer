@@ -18,7 +18,7 @@
     -LIST:WIDth <step>, <20us to 3600s>
         - unit is in seconds
 .query (basically just a write and read in one. remember to print out)
-    -
+    - doesn't retutrn anything?
     -
 
 .read
@@ -166,10 +166,10 @@ class ListProgrammer:
 
                     # STEP
                     elif param_name == "step":
-                        if 0 < param_value < 85:
+                        if 1 < param_value < 85:
                             self.step = int(param_value)
                         else:
-                            print("STEP: Value needs to be 0 < x < 85")
+                            print("STEP: Value needs to be 1 < x < 85")
                             params_approved = False
 
                     # LEVEL
@@ -220,7 +220,7 @@ class ListProgrammer:
         self.level = level
         self.slowRate = slowRate
         self.slew = slew # f'{slew:.2f}'
-        self.width = width # f'{width:.2f}'
+        self.width = width # f'{width:.5f}'
 
         print("\n---- Set List Parameters ----")
         if self.slowRate == 0:
@@ -234,7 +234,7 @@ class ListProgrammer:
 
     def read_load_list(self):
         if not fake_inst:
-            print("\n---- Session List Settings ----")
+            print("\n---------- Session List Settings ----------")
             print(f'Slow Rate: {self.controller.inst.query(f"LIST:SLOWrate?")}', end="")
             print(f'Range: {self.controller.inst.query(f"LIST:RANGe?")}', end="")
             print(f'Count: {self.controller.inst.query(f"LIST:COUNt?")}', end="")
@@ -248,25 +248,34 @@ class ListProgrammer:
 
 
     def write_list_params(self):
-        print('\n...WRITING SETTINGS TO CURRENT LIST...')
+        print('\nWRITING SETTINGS TO CURRENT LIST...')
         # self.controller.inst.write(f'LIST:RCL 1')
         # print(self.controller.inst.query('STAT:QUES:COND?'))
 
         self.controller.inst.write(f"LIST:SLOWrate {self.slowRate}")
+        print(f'LIST:SLOWrate {self.slowRate}')
         self.controller.inst.write(f"LIST:RANGe {self.range}")
+        print(f'LIST:RANGe {self.range}')
         self.controller.inst.write(f"LIST:COUNt {self.count}")
+        print(f'LIST:COUNt {self.count}')
         self.controller.inst.write(f"LIST:STEP {self.step}")
+        print(f'LIST:STEP {self.step}")')
 
         for i in range(1, self.step + 1):
             print(f'Step {i}: ')
             level_inc = (self.range / self.step) * i
 
-            self.controller.inst.write(f"LIST:LEVel {i}, {level_inc:.2f}")
+            self.controller.inst.write(f"LIST:LEVel {i}, {self.level:.3f}")
+            print(f'LIST:LEVel {i}, {self.level:.3f}')
             self.controller.inst.write(f"LIST:SLEW {i}, {self.slew:.2f}")
-            self.controller.inst.write(f"LIST:WIDth {i}, {self.width:.2f}")
-            self.controller.inst.query('*OPC?')
+            print(f"LIST:SLEW {i}, {self.slew:.2f}")
+            self.controller.inst.write(f"LIST:WIDth {i}, {self.width:.3f}")
+            print(f"LIST:WIDth {i}, {self.width:.3f}")
+            self.controller.inst.write('*WAI')
+            # self.controller.inst.query('*OPC?')
 
         self.controller.inst.write(f'LIST:SAV 1')
+        self.read_load_list()
 
     def read_all_load_lists(self):
         for location in range(1, 6):
@@ -288,37 +297,57 @@ class ListProgrammer:
     def restore_list(self, location):
         print('\n...RESTORING LIST IN LOCATION...')
         self.controller.inst.write(f'LIST:RCL {location}')
-        self.range = self.controller.inst.query(f"LIST:RANGe?")
-        self.slowRate = self.controller.inst.query(f"LIST:SLOWrate?")
-        self.count = self.controller.inst.query(f"LIST:COUNt?")
-        self.step = self.controller.inst.query(f"LIST:STEP?")
-        self.level = self.controller.inst.query(f"LIST:LEVel? 1")
-        self.width = self.controller.inst.query(f"LIST:WIDth? 1")
-        self.slew = self.controller.inst.query(f"LIST:SLEW? 1")
+
+        self.controller.inst.write(f"LIST:RANGe?")
+        self.range = self.controller.inst.read()
+
+        self.controller.inst.write(f"LIST:SLOW?")
+        self.slowRate = self.controller.inst.read()
+
+        self.controller.inst.write(f"LIST:COUNt?")
+        self.count = self.controller.inst.read()
+
+        self.controller.inst.write(f"LIST:STEP?")
+        self.step = self.controller.inst.read()
+
+        self.controller.inst.write(f"LIST:LEVel? 1")
+        self.level = self.controller.inst.read()
+
+        self.controller.inst.write(f"LIST:WIDth? 1")
+        self.width = self.controller.inst.read()
+
+        self.controller.inst.write(f"LIST:SLEW? 1")
+        self.slew = self.controller.inst.read()
+
+        print(self.slowRate, self.range, self.count, self.step, self.level, self.width, self.slew)
 
         if fake_inst:
             return self.range, self.slowRate, self.count, self.step, self.level, self.width, self.slew
 
     def run_list(self):
-        print('\n...NOW TRIGGERING RUN LIST...')
         self.controller.inst.write('FUNCtion:MODE LIST')
+        print('Load now in following mode: ', end='')
         print(self.controller.inst.query('FUNC:MODE?'))
+
+        print('\nNOW TRIGGERING RUN LIST...')
         self.controller.inst.write('TRIG:SOUR BUS')
+        print(self.controller.inst.query('TRIGGER:SOURCE?'))
         self.controller.inst.write("INPUT ON")
         self.controller.inst.write('*TRG')
-        print(self.controller.inst.query('STAT:OPER:COND?')) # get stat bit
+        # print(self.controller.inst.query('STAT:OPER:COND?')) # get stat bit
+
+        time.sleep(25) #
         self.controller.inst.write('*WAI')
-        self.controller.inst.write("input off")
+
+        self.controller.inst.write("INPUT OFF")
         self.controller.inst.write("func:mode fix")
+        print('DONE running list.')
 
     def error_check(self):
         print(self.controller.inst.query('SYSTem:ERRor?'))
 
     def save_list(self, location):
-        if not fake_inst:
-            self.controller.inst.write(f'LIST:SAV {location}')
-        else:
-            self.controller.inst.write(f'LIST:SAV {location}')
+        self.controller.inst.write(f'LIST:SAV {location}')
 
     def reset(self):
         print(self.controller.inst.query('*TST?'))
@@ -396,25 +425,17 @@ def main():
                     elif param_choice == '2':
                         list_programmer.write_list_params()
                     elif param_choice == '3':
-                        save_location = input("Select a save location (1-5): ")
-                        try:
-                            save_location = int(save_location)
-                            if 1 <= save_location <= 5:
-                                list_programmer.save_list(save_location)
-                                print("***DONE writing list to load")
-                            else:
-                                print("Invalid memory location. Retry.\n")
-                        except:
+                        save_location = int(input("Select a save location (1-5): "))
+                        if 1 <= save_location <= 5:
+                            list_programmer.save_list(save_location)
+                            print("***DONE writing list to load")
+                        else:
                             print("Invalid memory location. Retry.\n")
                     elif param_choice == '4':
-                        retrieval_location = input("Select a location to retrieve (1-5): ")
-                        try:
-                            retrieval_location = int(retrieval_location)
-                            if 1 <= retrieval_location <= 5:
-                                list_programmer.restore_list(retrieval_location)
-                            else:
-                                print("Invalid memory location. Retry.\n")
-                        except:
+                        retrieval_location = int(input("Select a location to retrieve (1-5): "))
+                        if 1 <= retrieval_location <= 5:
+                            list_programmer.restore_list(retrieval_location)
+                        else:
                             print("Invalid memory location. Retry.\n")
                     elif param_choice == '5':
                         break
@@ -464,6 +485,7 @@ def main():
                         break
 
             elif choice == '5':
+                list_programmer.reset()
                 controller.disconnect()
                 return False
 
