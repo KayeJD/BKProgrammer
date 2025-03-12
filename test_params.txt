@@ -1,7 +1,7 @@
 SlowRate 0
 Range 10
 Count 2
-Step 10
+Step 83
 Level 5
-Width 0.05
+Width 0.005
 Slew .1

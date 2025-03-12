@@ -10,23 +10,29 @@
         - essentially how quickly the output can transition from one level to another
         - determined by slowrate
     -LIST:COUNt <1 to 65536>
+        - # of times a list will execute
         - 65536 = inf
     -LIST:STEP <2 to 83>
+        - Divides the list to individual sections to differ LEVEL, SLEW, and WIDTH
         - making it to 84 will force it into fixed mode
     -LIST:LEV <1 to maxCurrRange>
         - 65536 = inf
     -LIST:WIDth <step>, <20us to 3600s>
+        - length of each step.
         - unit is in seconds
 .query (basically just a write and read in one. remember to print out)
-    - doesn't retutrn anything?
     - remember to read back or else it'll throw queue interrupted error
 ========================================================================================================================
 """
 
 import pyvisa as visa
-import sys
 import time
+import threading
+import os
+# from pynput import keybaord
+import pandas as pd
 
+# FAKE_INST ************************************************************************************************************
 fake_inst = False
 if fake_inst:
     list_queue = None
@@ -59,6 +65,11 @@ class MockInstrument:
     def read(self):
         return "Mock read response"
 
+    def close(self):
+        pass
+# **********************************************************************************************************************
+
+
 class Controller:
     def __init__(self):
         if not fake_inst:
@@ -89,7 +100,6 @@ class Controller:
     def check_connection(self):
         if not fake_inst:
             print(self.inst.query("*IDN?"))
-            # self.inst.read()
             try:
                 if self.idn:
                     print(f"Connected to: {self.idn}")
@@ -108,24 +118,23 @@ class Controller:
 class ListProgrammer:
     def __init__(self, controller: Controller):
         self.controller = controller
+
+        # Don't know which one of these to use yet
+        self.stop_event = threading.Event()
+        self.running = False
+
         self.range = 0
         self.count = 0
         self.step = 2
-        self.level = 0
+        self.level = 0.0
         self.slowRate = 0
         self.slew = 0.0
         self.width = 0.0
+        self.txt_params_approved = False
+        # self.list = [] # for .lists purposes
 
-        # self.range = None
-        # self.slowRate = None
-        # self.count = None
-        # self.step = None
-        # self.level = None
-        # self.width = None
-        # self.slew = None
-
-    def get_list_params(self, txt_file_path):
-        params_approved = True
+    def get_txt_list(self, txt_file_path):
+        self.txt_params_approved = True
 
         try:
             with open(txt_file_path, 'r') as file:
@@ -143,15 +152,15 @@ class ListProgrammer:
                             self.slowRate = int(param_value)
                         else:
                             print("SLOWRATE requires: 0 (High-rate (A/us) or 1 Slew: Low-rate (A/ms)")
-                            params_approved = False
+                            self.txt_params_approved = False
 
                     # RANGE
                     elif param_name == "range":
-                        if 0 < param_value < 85:
+                        if 0 < param_value < 84:
                             self.range = int(param_value)
                         else:
-                            print("RANGE requires: 0 < x < 85")
-                            params_approved = False
+                            print("RANGE requires: 0 < x < 84")
+                            self.txt_params_approved = False
 
                     # COUNT
                     elif param_name == "count":
@@ -159,15 +168,15 @@ class ListProgrammer:
                             self.count = int(param_value)
                         else:
                             print("COUNT requires: 0 < x < 65536")
-                            params_approved = False
+                            self.txt_params_approved = False
 
                     # STEP
                     elif param_name == "step":
                         if 1 < param_value < 84:
                             self.step = int(param_value)
                         else:
-                            print("STEP: Value needs to be 1 < x < 85")
-                            params_approved = False
+                            print("STEP: Value needs to be 1 < x < 84")
+                            self.txt_params_approved = False
 
                     # LEVEL
                     elif param_name == "level":
@@ -175,7 +184,7 @@ class ListProgrammer:
                             self.level = float(param_value)
                         else:
                             print("LEVEL requires: 0 < x < 85")
-                            params_approved = False
+                            self.txt_params_approved = False
 
                     # WIDTH
                     elif param_name == "width":
@@ -183,7 +192,7 @@ class ListProgrammer:
                             self.width = param_value
                         else:
                             print("WIDTH: Check Param Values")
-                            params_approved = False
+                            self.txt_params_approved = False
 
                     # SLEW
                     elif param_name == "slew":
@@ -191,13 +200,13 @@ class ListProgrammer:
                             self.slew = param_value
                         else:
                             print("SLEW: Check Param Values")
-                            params_approved = False
+                            self.txt_params_approved = False
 
         except FileNotFoundError:
             print("File not found.")
             return
 
-        if params_approved:
+        if self.txt_params_approved:
             print("\n---- Retrieved .txt List Parameters ----")
             if self.slowRate == 0:
                 print('Slew: High-rate (A/us)')
@@ -207,6 +216,41 @@ class ListProgrammer:
                   f'Level: {self.level} \t Slew: {self.slew} \t Width: {self.width}s \n')
         else:
             print('ERROR: One or more invalid values were provided.')
+
+    def get_csv_list(self, file_name):
+        print('RETRIEVING CSV LIST...')
+        file_path = f'lists/{file_name}.csv'
+
+        if not os.path.exists(file_path):
+            print(f"file not found: {file_path}.")
+            return False
+
+        df = pd.read_csv(file_path)
+        df = df.reset_index()
+        self.slowRate = df.loc[0, 'slowrate']
+        self.range = df.loc[0, 'range']
+        self.count = df.loc[0, 'count']
+        self.step = df.loc[0, 'step']
+
+        self.controller.inst.write(f"LIST:SLOWrate {self.slowRate}")
+        print(f'LIST:SLOWrate {self.slowRate}')
+        self.controller.inst.write(f"LIST:RANGe {self.range}")
+        print(f'LIST:RANGe {self.range}')
+        self.controller.inst.write(f"LIST:COUNt {self.count}")
+        print(f'LIST:COUNt {self.count}')
+        self.controller.inst.write(f"LIST:STEP {self.step}")
+        print(f'LIST:STEP {self.step}')
+
+        for index, row in df.iterrows():
+            step = int(str(index)) + 1
+            print(f'Step: {step}', end='\t') # Will be step
+            print(f"LIST:LEVel {step}, {row['level']:.2f}", end='\t')
+            print(f"LIST:SLEW {step}, {row['slew']:.2f}", end='\t')
+            print(f"LIST:WIDth {step}, {row['width']:.25}")
+
+        self.controller.inst.write(f'LIST:SAV 1')
+        return True
+
 
 
 # FAKE_INST ************************************************************************************************************
@@ -265,7 +309,7 @@ class ListProgrammer:
             print(f'Step {i}: ', end='\t')
             level_inc = (self.range / self.step) * i
 
-            self.controller.inst.write(f"LIST:LEVel {i}, {level_inc:.2f}")
+            self.controller.inst.write(f"LIST:LEVel {i}, {self.level:.2f}")
             print(f'LIST:LEVel {i}, {self.level:.2f}', end='\t')
             self.controller.inst.write(f"LIST:SLEW {i}, {self.slew:.2f}")
             print(f"LIST:SLEW {i}, {self.slew:.2f}", end='\t')
@@ -275,7 +319,7 @@ class ListProgrammer:
             # self.controller.inst.query('*OPC?')
 
         self.controller.inst.write(f'LIST:SAV 1')
-        # self.read_load_list()
+
 
     def read_all_load_lists(self):
         for location in range(1, 6):
@@ -293,6 +337,7 @@ class ListProgrammer:
                 print(f'Width={self.controller.inst.query(f"LIST:WIDth? {i}")}'
                       .replace("\n", " "), end="\t")
                 print(f'Slew={self.controller.inst.query(f"LIST:SLEW? {i}")}', end="")
+
 
     def restore_list(self, location):
         print('\n...RESTORING LIST IN LOCATION...')
@@ -324,6 +369,47 @@ class ListProgrammer:
         if fake_inst:
             return self.range, self.slowRate, self.count, self.step, self.level, self.width, self.slew
 
+
+    def save_to_csv(self, name):
+        file_path = f'lists/{name}.csv'
+        print('\nSAVING LIST TO CSV FILE...')
+
+        if not os.path.exists(file_path):
+            columns = ['level','slew','width','slowrate','range','count','step']
+            df = pd.DataFrame(columns=columns)
+            df.to_csv(file_path, index=False)
+            print(f"File '{file_path}' created.")
+        else:
+            f = open(file_path, "w+")
+            f.close()
+            columns = ['level', 'slew', 'width', 'slowrate', 'range', 'count', 'step']
+            df = pd.DataFrame(columns=columns)
+            df.to_csv(file_path, index=False)
+
+        df = pd.read_csv(file_path)
+        df.loc[2, 'slowrate'] = self.slowRate
+        df.loc[2, 'range'] = self.range
+        df.loc[2, 'count'] = self.count
+        df.loc[2, 'step'] = self.step
+        for i in range(1, self.step + 1):
+            df.loc[i, 'level'] = f'{self.level:.2f}'
+            df.loc[i, 'slew'] = f'{self.slew:.2f}'
+            df.loc[i, 'width'] = f'{self.width:.5f}'
+        df.to_csv(file_path, index=False)
+
+        print('\n.CSV FILE SAVED')
+
+
+    def listen_for_input(self):
+        while self.running:
+            choice = input("Enter [0] to end: ").strip()
+            if choice == '0':
+                self.controller.inst.write('*CLS') # Clears instrument event register
+                print("FINISHING PROCESS...")
+                self.running = False
+                self.stop_event.set()
+
+
     def run_list(self):
         self.controller.inst.write("list:rcl 1")
         self.controller.inst.write("func:mode list")
@@ -337,15 +423,41 @@ class ListProgrammer:
         self.controller.inst.write("INPUT ON")
         self.controller.inst.write('*WAI')
         self.controller.inst.write('*TRG')
-        # print(self.controller.inst.query('STAT:OPER:COND?')) # get stat bit
+
+        self.running = True
+        input_thread = threading.Thread(target=self.listen_for_input, daemon=True)
+        input_thread.start()
 
         execution_time = self.width * self.step * self.count
-        time.sleep(execution_time) #
-        self.controller.inst.write('*WAI')
+        # print(f'Runtime: {execution_time}s')
+        # time.sleep(execution_time) # UNCOMMENT if disabling input_thread.
 
+        self.controller.inst.write('*WAI')
+        self.stop_event.set()
+        self.running = False
+        input_thread.join()
+
+        self.controller.inst.write('*WAI')
         self.controller.inst.write("INPUT OFF")
         self.controller.inst.write("func:mode fix")
+        print(self.controller.inst.query('*OPC?'))
+        self.txt_params_approved = False
         print('DONE running list.')
+
+        # try:
+        #     execution_time = self.width * self.step * self.count
+        #     print(execution_time)
+        #     for i in range(math.ceil(execution_time)):
+        #         time.sleep(1)
+        # except KeyboardInterrupt:
+        #     print('PROCESS INTERRUPTED...')
+        # finally:
+        #     self.controller.inst.write('*WAI')
+        #     self.controller.inst.write("INPUT OFF")
+        #     self.controller.inst.write("func:mode fix")
+        #     print(self.controller.inst.query('*OPC?'))
+        #     print('DONE running list.')
+
 
     def error_check(self):
         print(f'Self-test result: {self.controller.inst.query('*TST?')}', end='')
@@ -353,8 +465,13 @@ class ListProgrammer:
         print(f'Error: {self.controller.inst.query('SYSTem:ERRor?')}')
         self.controller.inst.write('*WAI')
 
+
     def save_list(self, location):
-        self.controller.inst.write(f'LIST:SAV {location}')
+        if 1 <= location <= 5:
+            self.controller.inst.write(f'LIST:SAV {location}')
+        else:
+            print('Invalid input')
+
 
     def reset(self):
         self.error_check()
@@ -368,7 +485,7 @@ class ListProgrammer:
         # self.controller.inst.write('*WAI')
         # self.controller.inst.write("*ESE 0")
         # self.controller.inst.write('*WAI')
-        self.error_check()
+        # self.error_check()
 
 
 def print_main_menu():
@@ -384,21 +501,24 @@ def print_main_menu():
 
 
 def print_parameter_menu():
-    print("\n===== Parameter Configuration =====")
-    print("1. Load Parameters from File")
-    print("2. Set Parameters to Session")
-    print("3. Save Parameters to Memory")
-    print("4. Restore Parameters from Memory")
-    print("5. Back to Main Menu")
-    print("===================================")
+    print("\n======= Parameter Configuration =======")
+    print("1. Load Parameters from test_params.txt")
+    print("2. Set Steps to Session")
+    print("3. Save List to Load Memory")
+    print("4. Save to a .csv file")
+    print("5. Restore List from Memory")
+    print("6. Read Current Settings")
+    print("7. Back to Main Menu")
+    print("=======================================")
 
 
 def print_execution_menu():
-    print("\n====== Execution Options ======")
-    print("1. Run Current Session List")
-    print("2. Read Current Settings")
-    print("3. Back to Main Menu")
-    print("===============================")
+    print("\n======== Execution Options ========")
+    print("1. Run from .txt file")
+    print("2. Run from .csv file")
+    print("3. Read Current Settings")
+    print("4. Back to Main Menu")
+    print("===================================")
 
 
 def debug_menu():
@@ -415,11 +535,11 @@ def main():
         controller = Controller()
         controller.connect()
         list_programmer = ListProgrammer(controller)
-        list_programmer.get_list_params("test_params.txt")
+        list_programmer.get_txt_list("test_params.txt")
 
         while True:
             print_main_menu()
-            choice = input("Select an option (1-5): ").strip()
+            choice = input("Select an option (1-7): ").strip()
 
             if choice == '1':
                 try:
@@ -432,10 +552,11 @@ def main():
             elif choice == '2':
                 while True:
                     print_parameter_menu()
-                    param_choice = input("Select an option (1-5): ").strip()
+                    param_choice = input("Select an option (1-8): ").strip()
 
                     if param_choice == '1':
-                        list_programmer.get_list_params("test_params.txt")
+                        list_programmer.get_txt_list("test_params.txt")
+                        list_programmer.write_list_params()
                     elif param_choice == '2':
                         list_programmer.write_list_params()
                     elif param_choice == '3':
@@ -446,12 +567,17 @@ def main():
                         else:
                             print("Invalid memory location. Retry.\n")
                     elif param_choice == '4':
+                        name = input("Name the .csv file: ")
+                        list_programmer.save_to_csv(name)
+                    elif param_choice == '5':
                         retrieval_location = int(input("Select a location to retrieve (1-5): "))
                         if 1 <= retrieval_location <= 5:
                             list_programmer.restore_list(retrieval_location)
                         else:
                             print("Invalid memory location. Retry.\n")
-                    elif param_choice == '5':
+                    elif param_choice == '6':
+                        list_programmer.read_load_list()
+                    elif param_choice == '7':
                         break
                     else:
                         print("Invalid input. Please try again.")
@@ -461,15 +587,25 @@ def main():
                     print_execution_menu()
                     exec_choice = input("Select an option (1-3): ").strip()
                     if exec_choice == '1':
-                        list_programmer.run_list()
+                        list_programmer.get_txt_list("test_params.txt")
+                        list_programmer.write_list_params()
+                        if list_programmer.txt_params_approved:
+                            list_programmer.run_list()
+                        else:
+                            print("Invalid parameters. Please try again.")
                     elif exec_choice == '2':
-                        list_programmer.read_load_list()
+                        name = input("Type filename (exclude .csv): ")
+                        exists = list_programmer.get_csv_list(name)
+                        if exists:
+                            list_programmer.run_list()
                     elif exec_choice == '3':
+                        list_programmer.read_load_list()
+                    elif exec_choice == '4':
                         break
                     else:
                         print("Invalid input. Please try again.")
 
-            elif choice == '4':  # TODO: save the current session details bc it might bet overwritten
+            elif choice == '4':
                 list_programmer.read_all_load_lists()
                 list_programmer.controller.inst.write(f'LIST:RCL 1')
 
@@ -501,7 +637,7 @@ def main():
                         break
 
             elif choice == '5':
-                list_programmer.reset()
+                # list_programmer.reset()
                 controller.disconnect()
                 return False
 
