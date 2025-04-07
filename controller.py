@@ -33,7 +33,7 @@ import os
 import pandas as pd
 
 # FAKE_INST ************************************************************************************************************
-fake_inst = False
+fake_inst = True
 if fake_inst:
     list_queue = None
     inst_memory = {
@@ -76,6 +76,7 @@ class Controller:
             self.rm = visa.ResourceManager()
             self.inst = None
             self.idn = None
+            self.connection = False
         else:
             self.inst = MockInstrument()
 
@@ -89,6 +90,7 @@ class Controller:
                         print(str(index) + " : " + li[index])
                     choice = input("Which Device?: ")
                     self.inst = self.rm.open_resource(li[int(choice)])
+                    self.connection = True
                     break
                 except:
                     print(f"({i}) No connection Found.")
@@ -246,7 +248,7 @@ class ListProgrammer:
             print(f'Step: {step}', end='\t') # Will be step
             print(f"LIST:LEVel {step}, {row['level']:.2f}", end='\t')
             print(f"LIST:SLEW {step}, {row['slew']:.2f}", end='\t')
-            print(f"LIST:WIDth {step}, {row['width']:.25}")
+            print(f"LIST:WIDth {step}, {row['width']:.5f}")
 
         self.controller.inst.write(f'LIST:SAV 1')
         return True
@@ -541,6 +543,7 @@ def main():
             print_main_menu()
             choice = input("Select an option (1-7): ").strip()
 
+            # CHECK CONNECTION
             if choice == '1':
                 try:
                     controller.check_connection()
@@ -549,6 +552,7 @@ def main():
                     controller.disconnect()
                     controller.connect()
 
+            # PARAMETER CONFIGURATION
             elif choice == '2':
                 while True:
                     print_parameter_menu()
@@ -582,14 +586,15 @@ def main():
                     else:
                         print("Invalid input. Please try again.")
 
+            # EXECUTE LIST
             elif choice == '3':
                 while True:
                     print_execution_menu()
                     exec_choice = input("Select an option (1-3): ").strip()
                     if exec_choice == '1':
                         list_programmer.get_txt_list("test_params.txt")
-                        list_programmer.write_list_params()
                         if list_programmer.txt_params_approved:
+                            list_programmer.write_list_params()
                             list_programmer.run_list()
                         else:
                             print("Invalid parameters. Please try again.")
@@ -605,10 +610,12 @@ def main():
                     else:
                         print("Invalid input. Please try again.")
 
+            # READ ALL STORED LISTS
             elif choice == '4':
                 list_programmer.read_all_load_lists()
                 list_programmer.controller.inst.write(f'LIST:RCL 1')
 
+            # DEBUGGING
             elif choice == '0':
                 while True:
                     debug_menu()
