@@ -14,7 +14,6 @@ DOWNLOADS_DIR = os.path.join(os.path.expanduser('~'), 'Downloads')
 CONNECTION = False
 LIST_STATE = 'MANUAL'  # CSV, MANUAL...
 
-
 class App:
     def __init__(self):
         self.controller = controller.Controller()
@@ -27,11 +26,11 @@ class App:
         self.error_log = queue.Queue()
 
         self.input_range = 0
-        self.input_count = 1
-        self.input_step = 2
-        self.input_level = 1
+        self.input_count = 0
+        self.input_step = 0
+        self.input_level = 0
         self.input_slowrate = 0
-        self.input_slew = 0.1
+        self.input_slew = 0.0
         self.input_width = 0.0
 
         self.list_programmer.set_list_params(self.input_range, self.input_count, self.input_step, self.input_level,
@@ -230,6 +229,9 @@ def update_chart(chartx, charty, source_name):
 
 
 def update_csv_table(data):
+    for item in dpg.get_item_children('csv_table', slot=1):
+        dpg.delete_item(item)
+
     for index, row in data.iterrows():
         with dpg.table_row(parent="csv_table"):
             with dpg.table_cell(): # step
@@ -239,7 +241,7 @@ def update_csv_table(data):
                     dpg.add_text(str(value) if pd.notna(value) else "")
 
 
-def csv_chart_data(sender, app_data):
+def create_csv_chart_data(sender, app_data):
     global chartx, charty, chart_unit
     chartx = []
     charty = []
@@ -255,34 +257,49 @@ def csv_chart_data(sender, app_data):
 
     current_time = 0.0
     total_steps = int(data.at[0, 'step'])
+    count = int(data.at[0, 'count'])
 
-    for i in range(total_steps):
-        level = float(data.at[i, 'level'])
-        width = float(data.at[i, 'width'])
-        slew = float(data.at[i, 'slew'])
+    for repeat in range(count):  # Repeat full step sequence
+        for i in range(total_steps):
+            level = float(data.at[i, 'level'])
+            width = float(data.at[i, 'width'])
+            slew = float(data.at[i, 'slew'])
 
-        chartx.append(current_time)
-        charty.append(level)
-        # print(current_time, level)
-
-        # end of pulse
-        current_time += width
-        chartx.append(current_time)
-        charty.append(level)
-        # print(current_time, level)
-
-        if i + 1 < total_steps:
-            next_level = float(data.at[i + 1, 'level'])
-            current_time += slew
+            # Start of level
             chartx.append(current_time)
-            charty.append(next_level)
+            charty.append(level)
+
+            # End of level (pulse width)
+            current_time += width
+            chartx.append(current_time)
+            charty.append(level)
+
+            if i + 1 < total_steps:
+                next_level = float(data.at[i + 1, 'level'])
+                current_time += slew
+                chartx.append(current_time)
+                charty.append(next_level)
+
+            # # Slew to next level if not last step
+            # if i + 1 < total_steps:
+            #     next_level = float(data.at[i + 1, 'level'])
+            #     delta_I = abs(next_level - level)
+            #
+            #     if slew != 0:
+            #         transition_time = delta_I / slew
+            #     else:
+            #         transition_time = 0.0
+            #
+            #     current_time += transition_time
+            #     chartx.append(current_time)
+            #     charty.append(next_level)
 
     print(chartx)
     print(charty)
     update_chart(chartx, charty, app_data['file_name'])
 
 
-def manual_chart_data(steps, level, width, slew):
+def create_manual_chart_data(steps, level, width, slew):
     global chartx, charty, chart_unit
     chartx = []
     charty = []
@@ -310,6 +327,7 @@ def manual_chart_data(steps, level, width, slew):
     #         charty.append(next_level)
     #
     # update_chart(chartx, charty,'Manual Entry')
+
 
 def generate_sine_dataframe(params):
     amp = params["amplitude"]
@@ -341,6 +359,111 @@ def generate_sine_dataframe(params):
     print(df)
 
 
+def update_manual_configs(sender, app_data, user_data):
+    print(app_data)
+    for item in dpg.get_item_children('manual_configs', slot=1):
+        print(item)
+        dpg.delete_item(item)
+
+    print("")
+    dpg.render_dearpygui_frame()
+
+    match app_data:
+        case 'Square':
+            with dpg.table_row(parent='manual_configs'):
+                with dpg.table_cell():
+                    dpg.add_text('Amplitude: ')
+                with dpg.table_cell():
+                    dpg.add_input_int(min_value=1, min_clamped=True, default_value=app.input_level,
+                                      max_clamped=True, tag='input_level', width=-1)
+            with dpg.table_row(parent='manual_configs'):
+                with dpg.table_cell():
+                    dpg.add_text('High-level time: ')
+                with dpg.table_cell():
+                    dpg.add_input_int(min_value=1, min_clamped=True, default_value=app.input_level,
+                                      max_clamped=True, tag='input_highwidth', width=-1)
+            with dpg.table_row(parent='manual_configs'):
+                with dpg.table_cell():
+                    dpg.add_text('Low-level time: ')
+                with dpg.table_cell():
+                    dpg.add_input_int(min_value=1, min_clamped=True, default_value=app.input_level,
+                                      max_clamped=True, tag='input_lowwidth', width=-1)
+            with dpg.table_row(parent='manual_configs'):
+                with dpg.table_cell():
+                    dpg.add_text('Slew: ')
+                with dpg.table_cell():
+                    dpg.add_input_int(min_value=1, min_clamped=True,  default_value=app.input_level,
+                                  max_clamped=True, tag='input_slew', width=-1)
+        case 'Sin':
+            with dpg.table_row(parent='manual_configs'):
+                with dpg.table_cell():
+                    dpg.add_text('Amplitude: ')
+                with dpg.table_cell():
+                    dpg.add_input_int(min_value=1, min_clamped=True, default_value=app.input_level,
+                                      max_clamped=True, tag='input_level', width=-1)
+            with dpg.table_row(parent='manual_configs'):
+                with dpg.table_cell():
+                    dpg.add_text('Offset: ')
+                with dpg.table_cell():
+                    dpg.add_input_int(min_value=1, min_clamped=True, default_value=app.input_level,
+                                      max_clamped=True, tag='input_offset', width=-1)
+            with dpg.table_row(parent='manual_configs'):
+                with dpg.table_cell():
+                    dpg.add_text('Frequency: ')
+                with dpg.table_cell():
+                    dpg.add_input_int(min_value=1, min_clamped=True, default_value=app.input_level,
+                                      max_clamped=True, tag='input_frequency', width=-1)
+            with dpg.table_row(parent='manual_configs'):
+                with dpg.table_cell():
+                    dpg.add_text('Duration: ')
+                with dpg.table_cell():
+                    dpg.add_input_int(min_value=1, min_clamped=True, default_value=app.input_level,
+                                      max_clamped=True, tag='input_duration', width=-1)
+            with dpg.table_row(parent='manual_configs'):
+                with dpg.table_cell():
+                    dpg.add_text('Count: ')
+                with dpg.table_cell():
+                    dpg.add_input_int(min_value=1, min_clamped=True, default_value=app.input_level,
+                                      max_clamped=True, tag='input_count', width=-1)
+        case 'Custom':
+            with dpg.table_row(parent='manual_configs'):
+                with dpg.table_cell():
+                    dpg.add_text('Range: ')
+                with dpg.table_cell():
+                    dpg.add_input_int(min_value=0, min_clamped=True, default_value=app.input_range,
+                                  max_clamped=True, tag='input_range', width=-1)
+            with dpg.table_row(parent='manual_configs'):
+                with dpg.table_cell():
+                    dpg.add_text('Count: ')
+                with dpg.table_cell():
+                    dpg.add_input_int(min_value=1, max_value=65536, min_clamped=True,
+                                  default_value=app.input_count,
+                                  max_clamped=True, tag='input_count', width=-1)
+            with dpg.table_row(parent='manual_configs'):
+                with dpg.table_cell():
+                    dpg.add_text('Step: ')
+                with dpg.table_cell():
+                    dpg.add_input_int(min_value=2, max_value=83, min_clamped=True, default_value=app.input_step,
+                                  max_clamped=True, tag='input_step', width=-1)
+            with dpg.table_row(parent='manual_configs'):
+                with dpg.table_cell():
+                    dpg.add_text('Level: ')
+                with dpg.table_cell():
+                    dpg.add_input_int(min_value=1, min_clamped=True,
+                                                    default_value=app.input_level,
+                                                    max_clamped=True, tag='input_level', width=-1)
+            with dpg.table_row(parent='manual_configs'):
+                with dpg.table_cell():
+                    dpg.add_text('Width(s): ')
+                with dpg.table_cell():
+                    dpg.add_input_float(min_value=0, min_clamped=True, tag='input_width',
+                                                      default_value=app.input_width, width=-1)
+            with dpg.table_row(parent='manual_configs'):
+                with dpg.table_cell():
+                    dpg.add_text('Slew: ')
+                with dpg.table_cell():
+                    dpg.add_input_float(tag='input_slew', default_value=app.input_slew,
+                                                     width=-1)
 
 
 def _on_close(sender):
@@ -353,7 +476,7 @@ with dpg.theme() as no_connection_theme:
     with dpg.theme_component(dpg.mvAll):
         dpg.add_theme_color(dpg.mvThemeCol_Text, (255, 1, 1), category=dpg.mvThemeCat_Core)
 
-with dpg.file_dialog(directory_selector=False, show=False, callback=csv_chart_data, tag="file_dialog_tag", width=700,
+with dpg.file_dialog(directory_selector=False, show=False, callback=create_csv_chart_data, tag="file_dialog_tag", width=700,
                      height=400):
     dpg.add_file_extension(".csv", color=(0, 255, 0, 255))
     dpg.add_file_extension("")
@@ -371,52 +494,33 @@ with dpg.window(tag='dashboard_window', menubar=True, on_close=_on_close):
             with dpg.tab_bar():
                 with dpg.tab(label="MANUAL mode"):
                     dpg.add_text("General Settings:")
-                    with dpg.table(header_row=False, row_background=False,
+                    with dpg.group(horizontal=True):
+                        dpg.add_text('SlowRate: ')
+                        dpg.add_combo(("High-rate (A/us)", "Low-rate (A/ms)"), default_value="Low-rate (A/ms)",
+                                      tag='input_slowrate', width=-1)
+                    with dpg.group(horizontal=True):
+                        dpg.add_text('Shape: ')
+                        dpg.add_combo(("Square", "Sin", "Custom"), default_value="",
+                                      tag='shape', width=-1, callback=update_manual_configs)
+
+                    dpg.add_separator()
+
+                    with dpg.table(tag='manual_configs', header_row=False, row_background=False,
                                    borders_innerH=False, borders_outerH=False, borders_innerV=False,
-                                   borders_outerV=False, delay_search=True) as saved_list_1:
+                                   borders_outerV=False, delay_search=True):
                         dpg.add_table_column(width_fixed=True)
                         dpg.add_table_column()
 
                         with dpg.table_row():
-                            dpg.add_text('Shape Type: ')
-                            dpg.add_combo(("Square", "DC", "Sin", "Custom"), default_value="",
-                                          tag='shape', width=-1)
-                        with dpg.table_row():
-                            dpg.add_text('SlowRate: ')
-                            dpg.add_combo(("High-rate (A/us)", "Low-rate (A/ms)"), default_value="Low-rate (A/ms)",
-                                          tag='input_slowrate', width=-1)
-                        with dpg.table_row():
-                            dpg.add_text('Range: ')
-                            dpg.add_input_int(min_value=0, min_clamped=True, default_value=app.input_range,
-                                              max_clamped=True, tag='input_range', width=-1)
-                        with dpg.table_row():
-                            dpg.add_text('Count: ')
-                            dpg.add_input_int(min_value=1, max_value=65536, min_clamped=True,
-                                              default_value=app.input_count,
-                                              max_clamped=True, tag='input_count', width=-1)
-                        with dpg.table_row():
-                            dpg.add_text('Step: ')
-                            dpg.add_input_int(min_value=2, max_value=83, min_clamped=True, default_value=app.input_step,
-                                              max_clamped=True, tag='input_step', width=-1)
-                        with dpg.table_row():
-                            dpg.add_text('Level: ')
-                            app.input_level = dpg.add_input_int(min_value=1, min_clamped=True,
-                                                                default_value=app.input_level,
-                                                                max_clamped=True, tag='input_level', width=-1)
-                        with dpg.table_row():
-                            dpg.add_text('Width(s): ')
-                            app.input_width = dpg.add_input_float(min_value=0, min_clamped=True, tag='input_width',
-                                                                  default_value=app.input_width, width=-1)
-                        with dpg.table_row():
-                            dpg.add_text('Slew: ')
-                            app.input_slew = dpg.add_input_float(tag='input_slew', default_value=app.input_slew,
-                                                                 width=-1)
+                            dpg.add_text('Filler text')
+                            dpg.add_combo(("1", "2"), width=-1)
 
 
                     dpg.add_button(label='Update Plot', width=-1,
-                                   callback=manual_chart_data(app.input_step, app.input_level, app.input_width,
+                                   callback=create_manual_chart_data(app.input_step, app.input_level, app.input_width,
                                                               app.input_slew))
 
+                # CSV table
                 with dpg.tab(label="CSV mode"):
                     dpg.add_button(label='Select a .csv file', width=-1, callback=lambda:dpg.show_item("file_dialog_tag"))
                     dpg.add_separator()
@@ -462,13 +566,10 @@ with dpg.window(tag='dashboard_window', menubar=True, on_close=_on_close):
                         dpg.set_axis_limits("xaxis_tag2", app_data[0], app_data[1])
                         dpg.set_axis_limits("yaxis_tag2", app_data[2], app_data[3])
 
-
-
-
                     with dpg.plot(label="Full Load Profile", callback=query, query=True, height=250, width=-1):
                         dpg.add_plot_legend()
 
-                        dpg.add_plot_axis(dpg.mvXAxis, label=f"Time", tag='x_axis')  # TODO: UPDATE THE UNIT
+                        dpg.add_plot_axis(dpg.mvXAxis, label=f"Time {chart_unit}", tag='x_axis')  # TODO: UPDATE THE UNIT
                         dpg.add_plot_axis(dpg.mvYAxis, label="Current (A)", tag='y_axis')
                         dpg.add_line_series(chartx, charty, label=LIST_STATE, parent=dpg.last_item(), tag="series_list")
                         # dpg.add_stair_series(sindatax, sindatay, tag="stair_series", label="0.5 + 0.5 * sin(x)")
