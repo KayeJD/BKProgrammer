@@ -5,7 +5,6 @@ import numpy as np
 from datetime import datetime as dt
 from constants import *
 
-
 # def run_task():
 #     global running
 #     global paused
@@ -97,12 +96,18 @@ def update_csv_table(data):
 
 
 def create_csv_chart_data(sender, app_data):
+    print(sender)
     global chartx, charty, chart_unit
     chartx = []
     charty = []
 
-    data = pd.read_csv(app_data['file_path_name'])
-    update_csv_table(data)
+    if sender == "csv_sender":
+        data = pd.read_csv(app_data['file_path_name'])
+        update_csv_table(data)
+        source = app_data['file_name']
+    else:
+        data = app_data
+        source = "MANUAL"
 
     if int(data.at[0, 'slowrate']) == 1:
         chart_unit = '(ms)'
@@ -151,13 +156,21 @@ def create_csv_chart_data(sender, app_data):
 
     print(chartx)
     print(charty)
-    update_chart(chartx, charty, app_data['file_name'])
+    update_chart(chartx, charty, source)
 
 
-def create_manual_chart_data(steps, level, width, slew):
-    global chartx, charty, chart_unit
-    chartx = []
-    charty = []
+def create_manual_chart_data(shape):
+    match shape:
+        case "Sin":
+            generate_sine_dataframe(dpg.get_value("sin_amplitude"), dpg.get_value("sin_offset"),
+                                    dpg.get_value("sin_frequency"), dpg.get_value("sin_duration"),
+                                    dpg.get_value("sin_count"))
+        case "Custom":
+            generate_sine_dataframe()
+
+    # global chartx, charty, chart_unit
+    # chartx = []
+    # charty = []
 
     # current_time = 0.0
     # print(steps, level, width, slew)
@@ -184,16 +197,16 @@ def create_manual_chart_data(steps, level, width, slew):
     # update_chart(chartx, charty,'Manual Entry')
 
 
-def generate_sine_dataframe(params):
-    amp = params["amplitude"]
-    offset = params["offset"]
-    freq = params["frequency"]
-    duration = params["duration"]
-    slew = params["slew"]
-    slowrate = params["slowrate"]
-    rng = params["range"]
-    count = params["count"]
-    step_count = params["step_count"]
+def generate_sine_dataframe(amp, offset, freq, duration, count):
+    slew = 0.01
+    slowrate = dpg.get_value("input_slowrate")
+    if slowrate == "High-rate (A/us)":
+        slowrate = 0
+    else:
+        slowrate =  1
+
+    rng = amp + (amp/5)
+    step_count = 84
 
     time_steps = np.linspace(0, duration, step_count)
     levels = amp * np.sin(2 * np.pi * freq * time_steps) + offset
@@ -211,7 +224,7 @@ def generate_sine_dataframe(params):
     df.loc[0, "count"] = count
     df.loc[0, "step"] = step_count
 
-    print(df)
+    create_csv_chart_data("MANUAL SIN", df)
 
 
 def update_manual_configs(sender, app_data, user_data):
@@ -257,31 +270,31 @@ def update_manual_configs(sender, app_data, user_data):
                     dpg.add_text('Amplitude: ')
                 with dpg.table_cell():
                     dpg.add_input_int(min_value=1, min_clamped=True, default_value=app.input_level,
-                                      max_clamped=True, tag='input_level', width=-1)
+                                      max_clamped=True, tag='sin_amplitude', width=-1)
             with dpg.table_row(parent='manual_configs'):
                 with dpg.table_cell():
                     dpg.add_text('Offset: ')
                 with dpg.table_cell():
                     dpg.add_input_int(min_value=1, min_clamped=True, default_value=app.input_level,
-                                      max_clamped=True, tag='input_offset', width=-1)
+                                      max_clamped=True, tag='sin_offset', width=-1)
             with dpg.table_row(parent='manual_configs'):
                 with dpg.table_cell():
                     dpg.add_text('Frequency: ')
                 with dpg.table_cell():
                     dpg.add_input_int(min_value=1, min_clamped=True, default_value=app.input_level,
-                                      max_clamped=True, tag='input_frequency', width=-1)
+                                      max_clamped=True, tag='sin_frequency', width=-1)
             with dpg.table_row(parent='manual_configs'):
                 with dpg.table_cell():
                     dpg.add_text('Duration: ')
                 with dpg.table_cell():
                     dpg.add_input_int(min_value=1, min_clamped=True, default_value=app.input_level,
-                                      max_clamped=True, tag='input_duration', width=-1)
+                                      max_clamped=True, tag='sin_duration', width=-1)
             with dpg.table_row(parent='manual_configs'):
                 with dpg.table_cell():
                     dpg.add_text('Count: ')
                 with dpg.table_cell():
                     dpg.add_input_int(min_value=1, min_clamped=True, default_value=app.input_level,
-                                      max_clamped=True, tag='input_count', width=-1)
+                                      max_clamped=True, tag='sin_count', width=-1)
         case 'Custom':
             with dpg.table_row(parent='manual_configs'):
                 with dpg.table_cell():
