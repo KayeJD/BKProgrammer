@@ -1,4 +1,4 @@
-dearpygui==1.10.1
+dearpygui==2.0.0
 dearpygui-obj==0.8.0
 distro==1.9.0
 docutils==0.21.2

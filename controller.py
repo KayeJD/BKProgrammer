@@ -51,7 +51,7 @@ class MockInstrument:
     def query(self, command):
         if 'LIST:RCL' in command:
             memory = command[-1]
-            print(f'\n Recalled location {memory}')
+            print(f"\n Recalled location {memory}")
         else:
             print(f"Mock query: {command}")
 
@@ -234,6 +234,7 @@ class ListProgrammer:
         self.count = df.loc[0, 'count']
         self.step = df.loc[0, 'step']
 
+        # SETTING TO LOAD
         self.controller.inst.write(f"LIST:SLOWrate {self.slowRate}")
         print(f'LIST:SLOWrate {self.slowRate}')
         self.controller.inst.write(f"LIST:RANGe {self.range}")
@@ -246,9 +247,18 @@ class ListProgrammer:
         for index, row in df.iterrows():
             step = int(str(index)) + 1
             print(f'Step: {step}', end='\t') # Will be step
+
             print(f"LIST:LEVel {step}, {row['level']:.2f}", end='\t')
             print(f"LIST:SLEW {step}, {row['slew']:.2f}", end='\t')
             print(f"LIST:WIDth {step}, {row['width']:.5f}")
+            level = f"{row['level']:.2f}"
+            slew = f"{row['slew']:.2f}"
+            width = f"{row['width']:.5f}"
+
+            self.controller.inst.write(f"LIST:LEVel {step}, {level}")
+            self.controller.inst.write(f"LIST:SLEW {step}, {slew}")
+            self.controller.inst.write(f"LIST:WIDth {step}, {width}")
+            self.controller.inst.write('*WAI')
 
         self.controller.inst.write(f'LIST:SAV 1')
         return True
@@ -414,6 +424,20 @@ class ListProgrammer:
 
     def run_list(self):
         self.controller.inst.write("list:rcl 1")
+
+        print("\n---------- Session List Settings ----------")
+        print(f'Slow Rate: {self.controller.inst.query(f"LIST:SLOWrate?")}', end="")
+        print(f'Range: {self.controller.inst.query(f"LIST:RANGe?")}', end="")
+        print(f'Count: {self.controller.inst.query(f"LIST:COUNt?")}', end="")
+        print(f'Steps: {self.controller.inst.query(f"LIST:STEP?")}', end="")
+
+        for i in range(1, int(self.step) + 1):
+            print(f'Step {i}: '.replace("\n", " "), end="\t")
+            print(f'Level={self.controller.inst.query(f"LIST:LEVel? {i}")}'.replace("\n", " "), end="\t")
+            print(f'Width={self.controller.inst.query(f"LIST:WIDth? {i}")}'.replace("\n", " "), end="\t")
+            print(f'Slew={self.controller.inst.query(f"LIST:SLEW? {i}")}', end="")
+
+
         self.controller.inst.write("func:mode list")
         self.controller.inst.write('*WAI')
         print('Load now in following mode: ', end='')
@@ -494,7 +518,7 @@ def print_main_menu():
     print("\n============ BK Precision 8625 =============")
     print("Please select an option from the menu below:")
     print("1. Check connection")
-    print("2. List Configuration")
+    print("2. Saving/Retrieving")
     print("3. Execution Options")
     print("4. See all saved Lists")
     print("5. Exit")
@@ -503,20 +527,17 @@ def print_main_menu():
 
 
 def print_parameter_menu():
-    print("\n======= Parameter Configuration =======")
-    print("1. Load Parameters from test_params.txt")
-    print("2. Set Steps to Session")
-    print("3. Save List to Load Memory")
-    print("4. Save to a .csv file")
-    print("5. Restore List from Memory")
-    print("6. Read Current Settings")
-    print("7. Back to Main Menu")
+    print("\n======= Saving/Retrieving =======")
+    print("1. Save Current list to Load Memory")
+    print("2. Save to a .csv file")
+    print("3. Restore List from Load Memory")
+    print("4. Back to Main Menu")
     print("=======================================")
 
 
 def print_execution_menu():
     print("\n======== Execution Options ========")
-    print("1. Run from .txt file")
+    print("1. Run from test_params.txt file")
     print("2. Run from .csv file")
     print("3. Read Current Settings")
     print("4. Back to Main Menu")
@@ -559,29 +580,22 @@ def main():
                     param_choice = input("Select an option (1-8): ").strip()
 
                     if param_choice == '1':
-                        list_programmer.get_txt_list("test_params.txt")
-                        list_programmer.write_list_params()
-                    elif param_choice == '2':
-                        list_programmer.write_list_params()
-                    elif param_choice == '3':
                         save_location = int(input("Select a save location (1-5): "))
                         if 1 <= save_location <= 5:
                             list_programmer.save_list(save_location)
                             print("***DONE writing list to load")
                         else:
                             print("Invalid memory location. Retry.\n")
-                    elif param_choice == '4':
+                    elif param_choice == '2':
                         name = input("Name the .csv file: ")
                         list_programmer.save_to_csv(name)
-                    elif param_choice == '5':
+                    elif param_choice == '3':
                         retrieval_location = int(input("Select a location to retrieve (1-5): "))
                         if 1 <= retrieval_location <= 5:
                             list_programmer.restore_list(retrieval_location)
                         else:
                             print("Invalid memory location. Retry.\n")
-                    elif param_choice == '6':
-                        list_programmer.read_load_list()
-                    elif param_choice == '7':
+                    elif param_choice == '4':
                         break
                     else:
                         print("Invalid input. Please try again.")
