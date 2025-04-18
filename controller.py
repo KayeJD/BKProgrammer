@@ -526,7 +526,7 @@ def print_main_menu():
     print("============================================")
 
 
-def print_parameter_menu():
+def print_save_menu():
     print("\n======= Saving/Retrieving =======")
     print("1. Save Current list to Load Memory")
     print("2. Save to a .csv file")
@@ -562,7 +562,7 @@ def main():
 
         while True:
             print_main_menu()
-            choice = input("Select an option (1-7): ").strip()
+            choice = input("Select an option (1-5): ").strip()
 
             # CHECK CONNECTION
             if choice == '1':
@@ -576,8 +576,8 @@ def main():
             # PARAMETER CONFIGURATION
             elif choice == '2':
                 while True:
-                    print_parameter_menu()
-                    param_choice = input("Select an option (1-8): ").strip()
+                    print_save_menu()
+                    param_choice = input("Select an option (1-4): ").strip()
 
                     if param_choice == '1':
                         save_location = int(input("Select a save location (1-5): "))
@@ -604,7 +604,7 @@ def main():
             elif choice == '3':
                 while True:
                     print_execution_menu()
-                    exec_choice = input("Select an option (1-3): ").strip()
+                    exec_choice = input("Select an option (1-4): ").strip()
                     if exec_choice == '1':
                         list_programmer.get_txt_list("test_params.txt")
                         if list_programmer.txt_params_approved:
