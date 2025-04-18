@@ -33,7 +33,7 @@ import os
 import pandas as pd
 
 # FAKE_INST ************************************************************************************************************
-fake_inst = True
+fake_inst = False
 if fake_inst:
     list_queue = None
     inst_memory = {
@@ -462,9 +462,9 @@ class ListProgrammer:
 
 
     def error_check(self):
-        print(f'Self-test result: {self.controller.inst.query('*TST?')}', end='')
+        print(f"Self-test result: {self.controller.inst.query('*TST?')}", end='')
         self.controller.inst.write('*WAI')
-        print(f'Error: {self.controller.inst.query('SYSTem:ERRor?')}')
+        print(f"Error: {self.controller.inst.query('SYSTem:ERRor?')}")
         self.controller.inst.write('*WAI')
 
 
