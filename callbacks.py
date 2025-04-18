@@ -154,8 +154,8 @@ def create_csv_chart_data(sender, app_data):
             #     chartx.append(current_time)
             #     charty.append(next_level)
 
-    print(chartx)
-    print(charty)
+    # print(chartx)
+    # print(charty)
     update_chart(chartx, charty, source)
 
 
@@ -269,31 +269,31 @@ def update_manual_configs(sender, app_data, user_data):
                 with dpg.table_cell():
                     dpg.add_text('Amplitude: ')
                 with dpg.table_cell():
-                    dpg.add_input_int(min_value=1, min_clamped=True, default_value=app.input_level,
+                    dpg.add_input_int(min_value=0, min_clamped=True, default_value=0,
                                       max_clamped=True, tag='sin_amplitude', width=-1)
             with dpg.table_row(parent='manual_configs'):
                 with dpg.table_cell():
                     dpg.add_text('Offset: ')
                 with dpg.table_cell():
-                    dpg.add_input_int(min_value=1, min_clamped=True, default_value=app.input_level,
+                    dpg.add_input_int(min_value=0, min_clamped=True, default_value=0,
                                       max_clamped=True, tag='sin_offset', width=-1)
             with dpg.table_row(parent='manual_configs'):
                 with dpg.table_cell():
                     dpg.add_text('Frequency: ')
                 with dpg.table_cell():
-                    dpg.add_input_int(min_value=1, min_clamped=True, default_value=app.input_level,
+                    dpg.add_input_int(min_value=1, min_clamped=True, default_value=1,
                                       max_clamped=True, tag='sin_frequency', width=-1)
             with dpg.table_row(parent='manual_configs'):
                 with dpg.table_cell():
                     dpg.add_text('Duration: ')
                 with dpg.table_cell():
-                    dpg.add_input_int(min_value=1, min_clamped=True, default_value=app.input_level,
+                    dpg.add_input_int(min_value=0, min_clamped=True, default_value=1,
                                       max_clamped=True, tag='sin_duration', width=-1)
             with dpg.table_row(parent='manual_configs'):
                 with dpg.table_cell():
                     dpg.add_text('Count: ')
                 with dpg.table_cell():
-                    dpg.add_input_int(min_value=1, min_clamped=True, default_value=app.input_level,
+                    dpg.add_input_int(min_value=1, min_clamped=True, default_value=1,
                                       max_clamped=True, tag='sin_count', width=-1)
         case 'Custom':
             with dpg.table_row(parent='manual_configs'):
