@@ -1,5 +1,8 @@
 # BK Programmer
 
+BK Programmer is a Python-based command-line tool for interfacing with BK Precision instruments over USB. It supports batch programming workflows driven by CSV configuration files, allowing users to define and execute instrument sequences without manual input. Simply drop a .csv file into the /lists directory, connect device, and run.
+Well-suited for repetitive lab setups, QA testing pipelines, or any environment for consistent, repeatable instrument configuration
+
 ## Usage Instructions:
 
 ### Running from a CSV file:
